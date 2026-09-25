@@ -1,10 +1,14 @@
 import os, subprocess, time, re, statistics, psutil
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
+
+MEASUREMENT_TIME = 15 # in seconds
 
 interface = None
 gateway = None
 
 
+#fetches the wifi interface through iw dev (unstable)
 def get_wifi_interface():
     output  = subprocess.check_output(["iw", "dev"], text=True)
     
@@ -22,6 +26,7 @@ def get_wifi_interface():
 
     return None
 
+#fetches gateway through ip route
 def get_default_gateway():
     output = subprocess.check_output(["ip", "route"], text=True)
 
@@ -33,7 +38,7 @@ def get_default_gateway():
         return None
 
 
-
+#uses iw dev to parse network details (unstable)
 def get_iw_stats(interface):  
     output = subprocess.check_output(["iw", "dev", interface, "link"], text=True)
 
@@ -43,18 +48,21 @@ def get_iw_stats(interface):
     rx_bitrate_mbps_pattern = r"rx bitrate:\s*([\d.]+)"
     tx_bitrate_mbps_pattern = r"tx bitrate:\s*([\d.]+)"
 
-
-
     signal_match = re.search(signal_pattern, output)
     freq_match = re.search(freq_pattern, output)
     channel_width_match = re.search(channel_width_mhz_pattern, output)
     rx_bitrate_match = re.search(rx_bitrate_mbps_pattern, output)
     tx_bitrate_match = re.search(tx_bitrate_mbps_pattern, output)
 
-    return signal_match, freq_match, channel_width_match, rx_bitrate_match, tx_bitrate_match
+    return {
+        "rssi_dbm": float(signal_match.group(1)),
+        "frequency_mhz": float(freq_match.group(1)),
+        "channel_width_mhz": float(channel_width_match.group(1)),
+        "rx_bitrate_mbps": float(rx_bitrate_match.group(1)),
+        "tx_bitrate_mbps": float(tx_bitrate_match.group(1))
+    }
 
-
-
+#gets ping statistics and parses
 def get_ping_stats(gateway, test_time):
     output = subprocess.check_output(["ping","-i", "0.5", "-w", str(test_time), gateway], text=True)
 
@@ -69,15 +77,32 @@ def get_ping_stats(gateway, test_time):
 
     return ping_avg, ping_std, ping_p95
 
-
+#uses psutil to access cpu usage %
 def get_cpu_stats(test_time):
     cpu_usage = psutil.cpu_percent(interval=test_time)
 
     return(cpu_usage)
 
+#enables timing of get_iw_stats
+def collect_wifi_samples(interface, duration):
+    samples: []
+
+    start = time.time()
+
+    while time.time() - start < duration:
+        sample = get_iw_stats(interface)
+        samples.append(sample)
+
+        time.sleep(0.5)
+    return samples
+
+
 
 def run_speed_test():
-    pass
+    return {
+        "download_mbps": downlaod,
+        "upload_mbps": upload
+    }
 
 def create_dataset_row():
     pass
@@ -89,6 +114,34 @@ while interface == None or gateway == None:
     gateway = get_default_gateway()
 
 while True:
+
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        wifi_future = executor.submit(collect_wifi_samples, interface, MEASUREMENT_TIME)
+        
+        ping_future = executor.submit(get_ping_stats, gateway, MEASUREMENT_TIME)
+
+        cpu_future = executor.submit(get_cpu_stats, MEASUREMENT_TIME)
+
+        #speed_future
+        
+        
+
+        wifi_samples = wifi_future.result()
+        ping_stats = ping_future.result()
+        cpu_usage = cpu_future.result()
+
+
+        #aggregate samples
+
+        row = {
+
+            # all measurements
+
+        }
+
+        #save row
+
     #measurements concurrent
 
     #run_speed_test
@@ -97,15 +150,9 @@ while True:
 
     #add datasetrow & save
 
-    for i in range(5):
-        stats = get_iw_stats(interface)
-
-        time.sleep(0.5)
-
-
     #calc averages/sum
     #add to dataset
-    print()
+
 
 
 
