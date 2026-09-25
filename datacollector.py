@@ -2,7 +2,7 @@ import os, subprocess, time, re, statistics, psutil
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
-MEASUREMENT_TIME = 15 # in seconds
+MEASUREMENT_TIME = 30 # in seconds
 
 interface = None
 gateway = None
@@ -74,18 +74,24 @@ def get_ping_stats(gateway, test_time):
     ping_avg = statistics.mean(ping_list)
     ping_std = statistics.stdev(ping_list)
     ping_p95 = np.percentile(ping_list, 95)
+    
+    packet_loss_pct = float(pckt_loss.group(1))
 
-    return ping_avg, ping_std, ping_p95
+    return {
+       "ping_ms": ping_avg,
+        "jitter_ms": ping_std,
+       "ping_p95_ms": ping_p95,
+       "packet_loss_pct": packet_loss_pct
+    } 
 
 #uses psutil to access cpu usage %
 def get_cpu_stats(test_time):
     cpu_usage = psutil.cpu_percent(interval=test_time)
-
     return(cpu_usage)
 
 #enables timing of get_iw_stats
 def collect_wifi_samples(interface, duration):
-    samples: []
+    samples = []
 
     start = time.time()
 
@@ -99,9 +105,17 @@ def collect_wifi_samples(interface, duration):
 
 
 def run_speed_test():
+    output = subprocess.check_output(["speedtest"], text=True)
+
+    download_pattern = r"Download: (\S+)"
+    upload_pattern = r"Upload: (\S+)"
+
+    download_mbps = re.search(download_pattern, output)
+    upload_mbps = re.search(upload_pattern, output)
+
     return {
-        "download_mbps": downlaod,
-        "upload_mbps": upload
+        "download_mbps": float(download_mbps.group(1)),
+        "upload_mbps": float(upload_mbps.group(1))
     }
 
 def create_dataset_row():
@@ -109,35 +123,62 @@ def create_dataset_row():
 
 
 #main loop
-while interface == None or gateway == None:
-    interface = get_wifi_interface()
-    gateway = get_default_gateway()
+
+interface = get_wifi_interface()
+gateway = get_default_gateway()
+
+if interface is None:
+    raise RuntimeError("No WiFi interface found")
+if gateway is None:
+    raise RuntimeError("No default gateway found")
+
 
 while True:
 
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         wifi_future = executor.submit(collect_wifi_samples, interface, MEASUREMENT_TIME)
         
         ping_future = executor.submit(get_ping_stats, gateway, MEASUREMENT_TIME)
 
         cpu_future = executor.submit(get_cpu_stats, MEASUREMENT_TIME)
-
-        #speed_future
+        
+        speed_future = executor.submit(run_speed_test)
         
         
 
         wifi_samples = wifi_future.result()
         ping_stats = ping_future.result()
         cpu_usage = cpu_future.result()
+        speed_stats = speed_future.result()
 
 
         #aggregate samples
+        
+        rssi_avg = statistics.mean(sample["rssi_dbm"] for sample in wifi_samples)
+        frequency_avg = statistics.mean(sample["frequency_mhz"] for sample in wifi_samples)
+        channel_width_avg = statistics.mean(sample["channel_width_mhz"] for sample in wifi_samples)
+        rx_bitrate_avg = statistics.mean(sample["rx_bitrate_mbps"] for sample in wifi_samples)
+        tx_bitrate_avg = statistics.mean(sample["tx_bitrate_mbps"] for sample in wifi_samples)
+
+
 
         row = {
+            "rssi_dbm": rssi_avg,
+            "frequency_mhz": frequency_avg,
+            "channel_width_mhz": channel_width_avg,
+            "rx_bitrate_mbps": rx_bitrate_avg,
+            "tx_bitrate_mbps": tx_bitrate_avg,
 
-            # all measurements
+            "ping_ms": ping_stats["ping_ms"],
+            "ping_p95_ms": ping_stats["ping_p95_ms"],
+            "jitter_ms": ping_stats["jitter_ms"],
+            "packet_loss_pct": ping_stats["packet_loss_pct"],
 
+            "cpu_usage_pct": cpu_usage,
+
+            "download_mbps": speed_stats["download_mbps"],
+            "upload_mbps": speed_stats["upload_mbps"]
         }
 
         #save row
@@ -158,7 +199,6 @@ while True:
 
 
 
-#USE ip route 
 
 #averages over 5 seconds
 
