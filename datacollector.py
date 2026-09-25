@@ -72,6 +72,8 @@ def get_iw_stats(interface):
     rx_bitrate_match = re.search(rx_bitrate_mbps_pattern, output)
     tx_bitrate_match = re.search(tx_bitrate_mbps_pattern, output)
 
+    if not all ([signal_match, freq_match, channel_width_match, rx_bitrate_match, tx_bitrate_match]):
+        return None
     return {
         "rssi_dbm": float(signal_match.group(1)),
         "frequency_mhz": float(freq_match.group(1)),
@@ -122,7 +124,8 @@ def collect_wifi_samples(interface, duration):
 
     while time.time() - start < duration:
         sample = get_iw_stats(interface)
-        samples.append(sample)
+        if sample is not None:
+            samples.append(sample)
 
         time.sleep(0.5)
     return samples
@@ -154,8 +157,9 @@ def save_row(row):
 
         writer.writerow(row)
 
-#main loop
 
+
+#main loop
 interface = get_wifi_interface()
 gateway = get_default_gateway()
 
