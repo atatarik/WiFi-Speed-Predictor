@@ -181,6 +181,8 @@ while True:
             "upload_mbps": speed_stats["upload_mbps"]
         }
 
+        print(row)
+
         #save row
 
     #measurements concurrent
