@@ -1,13 +1,8 @@
-import os, argparse, subprocess, time, re 
+import os, subprocess, time, re 
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--router", required=False)
-parser.add_argument("--interface", required=False)
-
-args = parser.parse_args()
-router = args.router
-router_name = args.interface
+interface = None
+gateway = None
 
 
 def get_wifi_interface():
@@ -27,22 +22,72 @@ def get_wifi_interface():
 
     return None
 
+def get_default_gateway():
+    output = subprocess.check_output(["ip", "route"], text=True)
 
+    match = re.search(r"default via (\S+)", output)
+    
+    if match:
+        return match.group(1)
+    else:
+        return None
 
 
 
 def get_iw_stats(interface):  
     output = subprocess.check_output(["iw", "dev", interface, "link"], text=True)
 
-    signal = r""
-    freq = r""
-    channel_width_mhz = r""
-    rx_bitrate_mbps = r""
-    tx_bitrate_mbps = r""
-    return output
+    signal_pattern = r"signal:\s*(-?\d+)"
+    freq_pattern = r"freq:\s*([\d.]+)"
+    channel_width_mhz_pattern = r"(\d+)MHz"
+    rx_bitrate_mbps_pattern = r"rx bitrate:\s*([\d.]+)"
+    tx_bitrate_mbps_pattern = r"tx bitrate:\s*([\d.]+)"
+
+
+
+    signal_match = re.search(signal_pattern, output)
+    freq_match = re.search(freq_pattern, output)
+    channel_width_match = re.search(channel_width_mhz_pattern, output)
+    rx_bit rate_match = re.search(rx_bitrate_mbps_pattern, output)
+    tx_bitrate_match = re.search(tx_bitrate_mbps_pattern, output)
+
+    return 
+
+
+
+def get_ping_stats(gateway):
+    output = subprocess.check_output(["ping","-i", "0.5", "-w", "5", gateway])
+
+def get_cpu_stats():
+    pass
+
+
+def get_speed_stats():
+    pass
+
+
+
 
 #main loop
-print(get_iw_stats(get_wifi_interface()))
+while interface = None and gateway = None:
+    interface = get_wifi_interface()
+    gateway = get_default_gateway()
+
+while True:
+
+
+    for i in range(5):
+        stats = get_iw_stats(interface)
+
+        time.sleep(0.5)
+
+
+    #calc averages/sum
+    #add to dataset
+    print()
+
+
+
 
 
 #USE ip route 
