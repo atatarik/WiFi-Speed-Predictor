@@ -143,7 +143,7 @@ def run_speed_test():
         "upload_mbps": float(upload_mbps.group(1))
     }
 
-def save_row():
+def save_row(row):
     file_exists = os.path.isfile(CSV_FILE)
 
     with open(CSV_FILE, "a", newline="") as file:
