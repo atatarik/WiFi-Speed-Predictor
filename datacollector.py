@@ -1,8 +1,26 @@
-import os, subprocess, time, re, statistics, psutil
+import os, subprocess, time, re, statistics, psutil, csv
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
 MEASUREMENT_TIME = 30 # in seconds
+CSV_FILE = "wifi_dataset.csv"
+CSV_COLUMNS = [
+    "rssi_dbm",
+    "frequency_mhz",
+    "channel_width_mhz",
+    "rx_bitrate_mbps",
+    "tx_bitrate_mbps",
+    "ping_ms",
+    "ping_p95_ms",
+    "ping_std",
+    "jitter_ms",
+    "packet_loss_pct",
+    "cpu_usage_pct",
+    "download_mbps",
+    "upload_mbps"
+]
+
+
 
 interface = None
 gateway = None
@@ -73,14 +91,21 @@ def get_ping_stats(gateway, test_time):
     
     ping_avg = statistics.mean(ping_list)
     ping_std = statistics.stdev(ping_list)
-    ping_p95 = np.percentile(ping_list, 95)
+    ping_p95 = float(np.percentile(ping_list, 95))
     
     packet_loss_pct = float(pckt_loss.group(1))
 
+    differences = []
+    for i in range(1, len(ping_list)):
+        differences.append(abs(ping_list[i] - ping_list[i - 1]))
+    jitter_ms = statistics.mean(differences)
+
+
     return {
        "ping_ms": ping_avg,
-        "jitter_ms": ping_std,
+        "ping_std": ping_std,
        "ping_p95_ms": ping_p95,
+        "jitter_ms": jitter_ms,
        "packet_loss_pct": packet_loss_pct
     } 
 
@@ -118,9 +143,16 @@ def run_speed_test():
         "upload_mbps": float(upload_mbps.group(1))
     }
 
-def create_dataset_row():
-    pass
+def save_row():
+    file_exists = os.path.isfile(CSV_FILE)
 
+    with open(CSV_FILE, "a", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=CSV_COLUMNS)
+
+        if not file_exists:
+            writer.writeheader()
+
+        writer.writerow(row)
 
 #main loop
 
@@ -172,6 +204,7 @@ while True:
 
             "ping_ms": ping_stats["ping_ms"],
             "ping_p95_ms": ping_stats["ping_p95_ms"],
+            "ping_std": ping_stats["ping_std"],
             "jitter_ms": ping_stats["jitter_ms"],
             "packet_loss_pct": ping_stats["packet_loss_pct"],
 
@@ -181,37 +214,4 @@ while True:
             "upload_mbps": speed_stats["upload_mbps"]
         }
 
-        print(row)
-
-        #save row
-
-    #measurements concurrent
-
-    #run_speed_test
-
-    #finish measurements
-
-    #add datasetrow & save
-
-    #calc averages/sum
-    #add to dataset
-
-
-
-
-
-
-
-#averages over 5 seconds
-
-#rssi_dbm
-#frequency_mhz
-    #channel_width_mhz
-#rx_bitrate_mbps
-#tx_bitrate_mbps
-#ping_ms
-    #jitter_ms
-    #packet_loss_pct
-#cpu_usage_pct
-#download_mbps
-#upload_mbps
+        save_row(row)
