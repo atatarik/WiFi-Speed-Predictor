@@ -34,23 +34,15 @@ def get_wifi_interface():
 def get_iw_stats(interface):  
     output = subprocess.check_output(["iw", "dev", interface, "link"], text=True)
 
-    output = r""
-
-
+    signal = r""
+    freq = r""
+    channel_width_mhz = r""
+    rx_bitrate_mbps = r""
+    tx_bitrate_mbps = r""
     return output
 
-
-def get_values(output, name):
-    #pattern = 
-    match = re.search(pattern, output)
-
-    if match:
-        return int(match.group(1))
-    return None
-
-print(get_wifi_stats("wlp2s0"))
-
-
+#main loop
+print(get_iw_stats(get_wifi_interface()))
 
 
 #USE ip route 
@@ -59,7 +51,7 @@ print(get_wifi_stats("wlp2s0"))
 
 #rssi_dbm
 #frequency_mhz
-#channel_width_mhz
+    #channel_width_mhz
 #rx_bitrate_mbps
 #tx_bitrate_mbps
 #ping_ms
