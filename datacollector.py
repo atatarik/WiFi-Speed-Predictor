@@ -168,10 +168,8 @@ if interface is None:
 if gateway is None:
     raise RuntimeError("No default gateway found")
 
-
+print("starting quality tracking")
 while True:
-
-
     with ThreadPoolExecutor(max_workers=4) as executor:
         wifi_future = executor.submit(collect_wifi_samples, interface, MEASUREMENT_TIME)
         
@@ -219,3 +217,4 @@ while True:
         }
 
         save_row(row)
+        print("added row to database")
