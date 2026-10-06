@@ -8,7 +8,7 @@ y = data["download_mbps"].tolist()
 def mean(values):
     return sum(values) / float(len(values))
 
-def variance(values, mean):
+def sum_squared_deviations(values, mean):
     return sum([(x - mean)**2 for x in values])
 
 def covariance(x, mean_x, y, mean_y):
@@ -19,7 +19,7 @@ def covariance(x, mean_x, y, mean_y):
 
 def coefficients(x, y):
     x_mean, y_mean = mean(x), mean(y)
-    b1 = covariance(x, x_mean, y, y_mean) / variance(x, x_mean)
+    b1 = covariance(x, x_mean, y, y_mean) / sum_squared_deviationse(x, x_mean)
     b0 = y_mean - b1 * x_mean
     return [b0, b1]
 
