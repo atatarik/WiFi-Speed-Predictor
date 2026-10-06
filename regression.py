@@ -19,7 +19,7 @@ def covariance(x, mean_x, y, mean_y):
 
 def coefficients(x, y):
     x_mean, y_mean = mean(x), mean(y)
-    b1 = covariance(x, x_mean, y, y_mean) / sum_squared_deviationse(x, x_mean)
+    b1 = covariance(x, x_mean, y, y_mean) / sum_squared_deviations(x, x_mean)
     b0 = y_mean - b1 * x_mean
     return [b0, b1]
 
@@ -31,7 +31,13 @@ def simple_linear_regression(x, y):
         predictions.append(yhat)
     return predictions
 
+def predict(x, b0, b1):
+    predictions = []
 
+    for value in x:
+        predictions.append(b0 + b1 * value)
+
+    return predictions
 
 def rmse_metric(actual, predicted):
     sum_error = 0.0
@@ -47,5 +53,62 @@ def evaluate_algorithm(x, y, algorithm):
     return rmse
 
 
-rmse = evaluate_algorithm(x, y, simple_linear_regression)
-print(f"RMSE: {rmse}")
+def cli(b0, b1, x, y, predictions):
+    print("WiFi Predictor")
+    print(f"Samples:{len(x)}")
+    print(f"RMSE: {rmse_metric(y, predictions):.2f} Mbps")
+    print("\n type help for help")
+
+    while True:
+        command = input("\n> ").strip().split()
+
+        if not command:
+            continue
+
+        if command[0] == "predict":
+
+            if len(command) != 2:
+                print("Usage: predict <rssi>")
+                continue
+
+            rssi = float(command[1])
+            
+            if rssi < min(x) or rssi > max(x):
+                print("Warning: RSSI is outside the training data range.")
+
+
+            prediction = b0 + b1 * rssi
+
+            print(f"Predicted download speed: {prediction:.2f} Mbps")
+
+        elif command[0] == "stats":
+            print(f"Samples: {len(x)}")
+            print(f"RSSI min: {min(x):.2f} dBm")
+            print(f"RSSI max: {max(x):.2f} dBm")
+            print(f"Download min: {min(y):.2f} Mbps")
+            print(f"Download max: {max(y):.2f} Mbps")
+            print(f"RMSE: {rmse_metric(y, predictions):.2f} Mbps")
+
+        elif command[0] in ["quit", "exit"]:
+            break
+
+        elif command[0] == "help":
+
+            print("predict <rssi>       Predict download speed")
+            print("coefficients         Show b0 and b1")
+            print("stats                Show dataset statistics")
+            print("help                 Show commands")
+            print("quit                 Exit")
+
+        else:
+
+            print("Unknown command. Type 'help'.")
+
+
+
+
+
+b0, b1 = coefficients(x, y)
+predictions = predict(x, b0, b1)
+
+cli(b0, b1, x, y, predictions)
