@@ -1,0 +1,4 @@
+numpy
+psutil
+speedtest-cli
+pandas
