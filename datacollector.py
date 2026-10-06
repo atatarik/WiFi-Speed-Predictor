@@ -1,9 +1,11 @@
-import os, subprocess, time, re, statistics, psutil, csv
+import os, subprocess, time, re, statistics, psutil, csv, logging
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 
 MEASUREMENT_TIME = 30 # in seconds
 CSV_FILE = "wifi_dataset.csv"
+
+
 CSV_COLUMNS = [
     "rssi_dbm",
     "frequency_mhz",
@@ -20,6 +22,14 @@ CSV_COLUMNS = [
     "upload_mbps"
 ]
 
+#logger startup
+logging.basicConfig(
+    level=logging.INFO,
+    format+"%(asctime)s [%(levelname)s] %(message)s",
+)
+logger + logging.getLogger(__name__)
+
+
 
 
 interface = None
@@ -28,37 +38,46 @@ gateway = None
 
 #fetches the wifi interface through iw dev (unstable)
 def get_wifi_interface():
-    output  = subprocess.check_output(["iw", "dev"], text=True)
-    
-    interfaces  = re.findall(r"Interface (\S+)", output)
+    try:
+        output  = run_command(["iw", "dev"]) 
 
-    for interface in interfaces:
-        try:
-            link = subprocess.check_output(["iw", "dev", interface, "link"], text=True)
+        interfaces  = re.findall(r"Interface (\S+)", output)
 
-            if "Connected to" in link:
-                return interface
+        for interface in interfaces:
+            try:
+                link = subprocess.check_output(["iw", "dev", interface, "link"], text=True)
+
+                if "Connected to" in link:
+                    return interface
         
-        except subprocess.CalledProcessError:
-            pass
-
-    return None
+            except subprocess.CalledProcessError:
+                continue
+        return None
+    except RuntimeError as e:
+        logger.error("Could not find WiFi Interface: %s", e)
+        return None
 
 #fetches gateway through ip route
 def get_default_gateway():
-    output = subprocess.check_output(["ip", "route"], text=True)
-
-    match = re.search(r"default via (\S+)", output)
+    try:
+        output = run_command(["ip", "route"])
     
-    if match:
-        return match.group(1)
-    else:
+        match = re.search(r"default via (\S+)", output)
+    
+        if match:
+            return match.group(1)
         return None
+    except RuntimeError as e:
+        logger.error("Could not find default gateway: %s", e)
+        return None
+
+
+
 
 
 #uses iw dev to parse network details (unstable)
 def get_iw_stats(interface):  
-    output = subprocess.check_output(["iw", "dev", interface, "link"], text=True)
+    output = run_command(["iw", "dev", interface, "link"])
 
     signal_pattern = r"signal:\s*(-?\d+)"
     freq_pattern = r"freq:\s*([\d.]+)"
@@ -84,7 +103,8 @@ def get_iw_stats(interface):
 
 #gets ping statistics and parses
 def get_ping_stats(gateway, test_time):
-    output = subprocess.check_output(["ping","-i", "0.5", "-w", str(test_time), gateway], text=True)
+    output = run_command(["ping","-i", "0.5", "-w", str(test_time), gateway],
+                         timeout=test_time +5)
 
     ping_list = re.findall(r"time=(\S+)", output)
     pckt_loss = re.search(r"(\d+)% packet loss", output)
@@ -111,6 +131,8 @@ def get_ping_stats(gateway, test_time):
        "packet_loss_pct": packet_loss_pct
     } 
 
+
+#CPU
 #uses psutil to access cpu usage %
 def get_cpu_stats(test_time):
     cpu_usage = psutil.cpu_percent(interval=test_time)
@@ -130,10 +152,8 @@ def collect_wifi_samples(interface, duration):
         time.sleep(0.5)
     return samples
 
-
-
 def run_speed_test():
-    output = subprocess.check_output(["speedtest"], text=True)
+    output = run_command(["speedtest"], timeout=60)
 
     download_pattern = r"Download: (\S+)"
     upload_pattern = r"Upload: (\S+)"
@@ -157,18 +177,45 @@ def save_row(row):
 
         writer.writerow(row)
 
+def run_command(command, timeout=10):
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=True
+        )
+        return result.sdtout
 
+    except subprocess.TimeoutExpired:
+        raise RuntimeError(
+            f"Command timed out: {' '.join(command)}"
+        )
+
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(
+            f"Command failed: {' '.join(command)}\n"
+            f"stderr: {e.stderr.strip()}"
+        )
+
+    except FileNotFoundError:
+        raise RuntimeError(
+            f"Command not found: {command[0]}"
+        )
 
 #main loop
 interface = get_wifi_interface()
 gateway = get_default_gateway()
 
 if interface is None:
+    logger.warning("No WiFi interface found")
     raise RuntimeError("No WiFi interface found")
 if gateway is None:
+    logger.warning("No default gateway found")
     raise RuntimeError("No default gateway found")
 
-print("starting quality tracking")
+logger.info("Starting quality tracking")
 while True:
     with ThreadPoolExecutor(max_workers=4) as executor:
         wifi_future = executor.submit(collect_wifi_samples, interface, MEASUREMENT_TIME)
@@ -217,4 +264,4 @@ while True:
         }
 
         save_row(row)
-        print("added row to database")
+        logger.info("added row to database")
