@@ -79,9 +79,9 @@ def get_default_gateway():
 def get_iw_stats(interface):  
     output = run_command(["iw", "dev", interface, "link"])
 
-    signal_pattern = r"signal:\s*(-?\d+)"
+    signal_pattern = r"signal:\s*(-?\d+(?:\.\d+)?)"
     freq_pattern = r"freq:\s*([\d.]+)"
-    channel_width_mhz_pattern = r"(\d+)MHz"
+    channel_width_mhz_pattern = r"(\d+)\s*MHz"
     rx_bitrate_mbps_pattern = r"rx bitrate:\s*([\d.]+)"
     tx_bitrate_mbps_pattern = r"tx bitrate:\s*([\d.]+)"
 
